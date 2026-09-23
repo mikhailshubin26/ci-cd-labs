@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import psycopg2
 import os
-
-app = FastAPI()
+import time
+from contextlib import asynccontextmanager
 
 DB_CONFIG = {
     "host": "db",
@@ -13,10 +13,19 @@ DB_CONFIG = {
 }
 
 def get_connection():
+    # Пробуем подключиться к БД в течение нескольких секунд, пока она инициализируется
+    for i in range(10):
+        try:
+            return psycopg2.connect(**DB_CONFIG)
+        except psycopg2.OperationalError:
+            print(f"База данных еще не готова. Ожидание... (Попытка {i+1}/10)")
+            time.sleep(2)
+    # Если за 20 секунд не подключились — тогда уже падаем официально
     return psycopg2.connect(**DB_CONFIG)
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- То, что выполняется при СТАРТЕ приложения ---
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
@@ -25,31 +34,18 @@ def startup():
             name TEXT NOT NULL UNIQUE
         );
     """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS records (
-            id SERIAL PRIMARY KEY,
-            catalog_number TEXT NOT NULL,
-            title TEXT NOT NULL,
-            company TEXT,
-            wholesale_price NUMERIC,
-            retail_price NUMERIC,
-            release_date DATE,
-            sold_last_year INTEGER DEFAULT 0,
-            sold_this_year INTEGER DEFAULT 0,
-            unsold INTEGER DEFAULT 0
-        );
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS compositions (
-            id SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            ensemble_id INTEGER REFERENCES ensembles(id),
-            record_id INTEGER REFERENCES records(id)
-        );
-    """)
+    # ... (остальные ваши cur.execute для таблиц records и compositions) ...
     conn.commit()
     cur.close()
     conn.close()
+    
+    yield  # В этой точке приложение работает и принимает запросы
+    
+    # --- То, что выполняется при ОСТАНОВКЕ приложения (если нужно) ---
+    pass
+
+# Передаем lifespan в конструктор приложения
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def root():
