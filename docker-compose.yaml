@@ -19,6 +19,10 @@ services:
     hostname: music_shop_app
     ports:
       - "8000:8000"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       - db
     restart: unless-stopped
