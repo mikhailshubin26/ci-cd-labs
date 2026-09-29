@@ -49,7 +49,7 @@ object DockerBuild : BuildType({
         features {
         dockerSupport {
             loginToRegistry = on {
-                dockerRegistryId = "PROJECT_EXT_2"
+                dockerRegistryId = "PROJECT_EXT_3"
             }
         }
     }
