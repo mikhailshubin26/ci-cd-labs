@@ -49,7 +49,7 @@ object DockerBuild : BuildType({
     features {
         dockerSupport {
             loginToRegistry = on {
-                dockerRegistryEndpoint = "PROJECT_EXT_2"
+                registryConnection = "PROJECT_EXT_2"
             }
         }
     }
