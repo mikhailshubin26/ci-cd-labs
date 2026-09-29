@@ -1,4 +1,5 @@
 import jetbrains.buildServer.configs.kotlin.*
+import jetbrains.buildServer.configs.kotlin.projectFeatures.dockerRegistry
 import jetbrains.buildServer.configs.kotlin.triggers.vcs
 
 /*
@@ -28,6 +29,15 @@ version = "2026.2"
 project {
 
     buildType(DockerBuild)
+
+    features {
+        dockerRegistry {
+            id = "PROJECT_EXT_2"
+            name = "Docker Registry"
+            userName = "mikhailshubin26"
+            password = "credentialsJSON:4bfc25fb-bea9-40b4-a140-7a61f1df5a1d"
+        }
+    }
 }
 
 object DockerBuild : BuildType({
