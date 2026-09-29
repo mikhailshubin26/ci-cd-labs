@@ -46,10 +46,10 @@ object DockerBuild : BuildType({
         }
     }
 
-    features {
+        features {
         dockerSupport {
             loginToRegistry = on {
-                registryConnection = "PROJECT_EXT_2"
+                dockerRegistryId = "PROJECT_EXT_2"
             }
         }
     }
