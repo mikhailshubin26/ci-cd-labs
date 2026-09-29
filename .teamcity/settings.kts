@@ -2,11 +2,20 @@ import jetbrains.buildServer.configs.kotlin.*
 import jetbrains.buildServer.configs.kotlin.buildSteps.dockerCommand
 import jetbrains.buildServer.configs.kotlin.buildFeatures.dockerSupport
 import jetbrains.buildServer.configs.kotlin.triggers.vcs
+import jetbrains.buildServer.configs.kotlin.projectFeatures.dockerRegistryConnection
 
 version = "2026.2"
 
 project {
     buildType(DockerBuild)
+
+    features {
+        dockerRegistryConnection {
+            id = "PROJECT_EXT_3"
+            name = "Docker Hub Connection"
+            registryType = "dockerhub"
+        }
+    }
 }
 
 object DockerBuild : BuildType({
@@ -46,7 +55,7 @@ object DockerBuild : BuildType({
         }
     }
 
-        features {
+    features {
         dockerSupport {
             loginToRegistry = on {
                 dockerRegistryId = "PROJECT_EXT_3"
