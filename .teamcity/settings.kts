@@ -38,8 +38,9 @@ object DockerBuild : BuildType({
             name = "Push image"
             id = "dockerPush"
             conditions {
-                matches("teamcity.build.branch", "refs/heads/(dev|prod)")
+                matches("teamcity.build.branch", "(refs/heads/)?(dev|prod)")
             }
+
             commandType = push {
                 namesAndTags = "%docker.image.name%:%docker.image.tag%"
             }
