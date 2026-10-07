@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16
+    container_name: music_shop_db
+    hostname: music_shop_db
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    image: mikhailshubin26/ci-cd-labs-app:${APP_TAG:?APP_TAG is required}
+    container_name: music_shop_app
+    hostname: music_shop_app
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
