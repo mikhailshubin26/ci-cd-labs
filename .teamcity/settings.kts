@@ -82,7 +82,7 @@ object DockerBuild : BuildType({
             }
             scriptContent = """
                 set -e
-                ssh -o StrictHostKeyChecking=accept-new %stage.user%@%stage.host% "curl -fsS --retry 15 --retry-delay 2 --retry-connrefused -o /dev/null http://localhost:8000/docs && echo 'STAGE OK, tag %docker.image.tag%'"
+                ssh -o StrictHostKeyChecking=accept-new %stage.user%@%stage.host% 'for i in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:8000/docs && echo "STAGE OK, tag %docker.image.tag%" && exit 0; sleep 2; done; echo "STAGE FAILED"; exit 1'
             """.trimIndent()
         }
     }
