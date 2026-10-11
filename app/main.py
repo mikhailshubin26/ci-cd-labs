@@ -51,6 +51,10 @@ app = FastAPI(lifespan=lifespan)
 async def root():
     return {"message": "Hello World"}
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 # ---------- Pydantic-модели ----------
 
 class EnsembleIn(BaseModel):
