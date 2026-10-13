@@ -31,11 +31,8 @@ object DockerBuild : BuildType({
             id = "banditScan"
             scriptContent = """
                 set -e
-                pip install --no-cache-dir bandit
-                bandit -r app -lll -iii
+                docker run --rm --volumes-from teamcity-agent -w %teamcity.build.checkoutDir% python:3.13-slim sh -c "pip install --no-cache-dir -q bandit && bandit -r app -lll -iii"
             """.trimIndent()
-            dockerImage = "python:3.13-slim"
-            dockerPull = true
         }
 
         script {
