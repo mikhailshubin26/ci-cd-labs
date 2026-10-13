@@ -40,7 +40,7 @@ object DockerBuild : BuildType({
             id = "gitleaksScan"
             scriptContent = """
                 set -e
-                docker run --rm --volumes-from teamcity-agent zricethezav/gitleaks:latest dir %teamcity.build.checkoutDir% --redact --exit-code 1 -v
+                docker run --rm --volumes-from teamcity-agent zricethezav/gitleaks:latest dir %teamcity.build.checkoutDir%/app --redact --exit-code 1 -v
             """.trimIndent()
         }
 
