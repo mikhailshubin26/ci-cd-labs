@@ -26,6 +26,27 @@ object DockerBuild : BuildType({
     }
 
     steps {
+        script {
+            name = "Security scan (Bandit)"
+            id = "banditScan"
+            scriptContent = """
+                set -e
+                pip install --no-cache-dir bandit
+                bandit -r app -lll -iii
+            """.trimIndent()
+            dockerImage = "python:3.13-slim"
+            dockerPull = true
+        }
+
+        script {
+            name = "Secrets scan (Gitleaks)"
+            id = "gitleaksScan"
+            scriptContent = """
+                set -e
+                docker run --rm --volumes-from teamcity-agent zricethezav/gitleaks:latest dir %teamcity.build.checkoutDir% --redact --exit-code 1 -v
+            """.trimIndent()
+        }
+
         dockerCommand {
             name = "Build image"
             id = "dockerBuild"
