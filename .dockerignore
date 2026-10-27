@@ -8,3 +8,5 @@ venv/
 volume/
 Dockerfile
 docker-compose.yaml
+*.jpg
+*.pdf
