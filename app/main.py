@@ -34,7 +34,28 @@ async def lifespan(app: FastAPI):
             name TEXT NOT NULL UNIQUE
         );
     """)
-    # ... (остальные ваши cur.execute для таблиц records и compositions) ...
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS records (
+            id SERIAL PRIMARY KEY,
+            catalog_number TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            company TEXT,
+            wholesale_price NUMERIC(10,2),
+            retail_price NUMERIC(10,2),
+            release_date DATE,
+            sold_last_year INT NOT NULL DEFAULT 0,
+            sold_this_year INT NOT NULL DEFAULT 0,
+            unsold INT NOT NULL DEFAULT 0
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS compositions (
+            id SERIAL PRIMARY KEY,
+            title TEXT NOT NULL,
+            ensemble_id INT NOT NULL REFERENCES ensembles(id) ON DELETE CASCADE,
+            record_id INT NOT NULL REFERENCES records(id) ON DELETE CASCADE
+        );
+    """)
     conn.commit()
     cur.close()
     conn.close()
