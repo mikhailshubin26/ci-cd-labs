@@ -10,3 +10,6 @@ venv/
 volume/
 
 .idea/
+
+*.pdf
+*.jpg
