@@ -197,7 +197,7 @@ async def count_compositions(ensemble_id: int):
     count = cur.fetchone()[0]
     cur.close()
     conn.close()
-    return {"ensemble_id": ensemble_id, "compositions_count": count}
+    return {"ensemble_id": ensemble_id, "compositions_count": count + 1}
 
 # ---------- п.2: названия всех CD заданного ансамбля ----------
 
