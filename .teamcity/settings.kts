@@ -44,6 +44,28 @@ object DockerBuild : BuildType({
             """.trimIndent()
         }
 
+        script {
+            name = "Unit tests (pytest)"
+            id = "unitTests"
+            scriptContent = """
+                set -e
+                docker run --rm --volumes-from teamcity-agent -w %teamcity.build.checkoutDir% python:3.13-slim sh -c "pip install --no-cache-dir -q -r requirements.txt pytest httpx teamcity-messages && pytest tests/unit --teamcity -v"
+            """.trimIndent()
+        }
+ 
+        script {
+            name = "Integration tests (pytest + PostgreSQL)"
+            id = "integrationTests"
+            scriptContent = """
+                set -e
+                trap 'docker rm -f it-db-%build.number% >/dev/null 2>&1 || true; docker network rm it-net-%build.number% >/dev/null 2>&1 || true' EXIT
+                docker network create it-net-%build.number%
+                docker run -d --name it-db-%build.number% --network it-net-%build.number% --network-alias db -e POSTGRES_DB=testdb -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test postgres:16-alpine
+                timeout 60 sh -c 'until docker exec it-db-%build.number% pg_isready -U test -d testdb; do sleep 1; done'
+                docker run --rm --network it-net-%build.number% --volumes-from teamcity-agent -w %teamcity.build.checkoutDir% -e POSTGRES_DB=testdb -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test python:3.13-slim sh -c "pip install --no-cache-dir -q -r requirements.txt pytest httpx teamcity-messages && pytest tests/integration --teamcity -v"
+            """.trimIndent()
+        }
+
         dockerCommand {
             name = "Build image"
             id = "dockerBuild"
