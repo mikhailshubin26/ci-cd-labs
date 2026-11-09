@@ -44,8 +44,8 @@ object DockerBuild : BuildType({
             """.trimIndent()
         }
 
-	script {
-	    name = "SQL security scan (Semgrep)"
+        script {
+            name = "SQL security scan (Semgrep)"
             id = "semgrepScan"
             scriptContent = """
                 set -e
