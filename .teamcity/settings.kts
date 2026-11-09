@@ -45,6 +45,15 @@ object DockerBuild : BuildType({
         }
 
         script {
+            name = "SQL security scan (Semgrep)"
+            id = "semgrepScan"
+            scriptContent = """
+                set -e
+                docker run --rm --volumes-from teamcity-agent -w %teamcity.build.checkoutDir% semgrep/semgrep semgrep scan --config p/sql-injection --metrics=off --error app db
+            """.trimIndent()
+        }
+
+        script {
             name = "Unit tests (pytest)"
             id = "unitTests"
             scriptContent = """
