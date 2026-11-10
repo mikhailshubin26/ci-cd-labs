@@ -19,5 +19,8 @@ changeBuildType(RelativeId("DockerBuild")) {
         add {
             password("stage.db.password", "credentialsJSON:9a822a0f-5ece-4111-b9f9-9960303d1900")
         }
+        add {
+            param("test.db.user", "musicshop_user")
+        }
     }
 }
