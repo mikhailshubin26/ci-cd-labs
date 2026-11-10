@@ -49,7 +49,10 @@ object DockerBuild : BuildType({
             id = "semgrepScan"
             scriptContent = """
                 set -e
-                docker run --rm --volumes-from teamcity-agent -w %teamcity.build.checkoutDir% semgrep/semgrep semgrep scan --config p/sql-injection --metrics=off --error app db
+                TARGETS="app"
+                if [ -d db ]; then TARGETS="app db"; fi
+                echo "Semgrep targets: ${'$'}TARGETS"
+                docker run --rm --volumes-from teamcity-agent -w %teamcity.build.checkoutDir% semgrep/semgrep semgrep scan --config p/sql-injection --metrics=off --error ${'$'}TARGETS
             """.trimIndent()
         }
 
