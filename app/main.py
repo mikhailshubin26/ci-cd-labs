@@ -59,7 +59,8 @@ async def lifespan(app: FastAPI):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS genres (
             id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE
+            name TEXT NOT NULL UNIQUE,
+            description TEXT
         );
     """)
     conn.commit()
@@ -105,6 +106,7 @@ class CompositionIn(BaseModel):
 
 class GenreIn(BaseModel):
     name: str
+    description: str | None = None
 
 # ---------- п.5: ввод новых данных об ансамблях ----------
 
@@ -137,24 +139,24 @@ async def add_genre(genre: GenreIn):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO genres (name) VALUES (%s) RETURNING id;",
-        (genre.name,)
+        "INSERT INTO genres (name, description) VALUES (%s, %s) RETURNING id;",
+        (genre.name, genre.description)
     )
     genre_id = cur.fetchone()[0]
     conn.commit()
     cur.close()
     conn.close()
-    return {"id": genre_id, "name": genre.name}
+    return {"id": genre_id, "name": genre.name, "description": genre.description}
 
 @app.get("/genres")
 async def list_genres():
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, name FROM genres ORDER BY id;")
+    cur.execute("SELECT id, name, description FROM genres ORDER BY id;")
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return [{"id": r[0], "name": r[1]} for r in rows]
+    return [{"id": r[0], "name": r[1], "description": r[2]} for r in rows]
 
 # ---------- п.4: ввод/изменение данных о пластинках ----------
 

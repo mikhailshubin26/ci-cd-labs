@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1GhlkwTP94yNUICiLdSyCywTsYhwN49H7ibUGuy8gCXb14SOFBsl8ryHOblOktj
+\restrict sZY4TqkYWo5PNKbvGdTktfep4WCudA2nWEWxFSykyO4YuG7cqEyRAHs2P9hm5wB
 
 -- Dumped from database version 16.15 (Debian 16.15-1.pgdg13+2)
 -- Dumped by pg_dump version 16.15 (Debian 16.15-1.pgdg13+2)
@@ -90,7 +90,8 @@ ALTER SEQUENCE public.ensembles_id_seq OWNED BY public.ensembles.id;
 
 CREATE TABLE public.genres (
     id integer NOT NULL,
-    name text NOT NULL
+    name text NOT NULL,
+    description text
 );
 
 
@@ -248,5 +249,5 @@ ALTER TABLE ONLY public.compositions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1GhlkwTP94yNUICiLdSyCywTsYhwN49H7ibUGuy8gCXb14SOFBsl8ryHOblOktj
+\unrestrict sZY4TqkYWo5PNKbvGdTktfep4WCudA2nWEWxFSykyO4YuG7cqEyRAHs2P9hm5wB
 
