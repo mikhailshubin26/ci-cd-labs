@@ -22,5 +22,8 @@ changeBuildType(RelativeId("DockerBuild")) {
         add {
             param("test.db.user", "musicshop_user")
         }
+        add {
+            param("test.db.name", "musicshop")
+        }
     }
 }
