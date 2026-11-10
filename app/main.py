@@ -56,6 +56,12 @@ async def lifespan(app: FastAPI):
             record_id INT NOT NULL REFERENCES records(id) ON DELETE CASCADE
         );
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS genres (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE
+        );
+    """)
     conn.commit()
     cur.close()
     conn.close()
@@ -97,6 +103,9 @@ class CompositionIn(BaseModel):
     ensemble_id: int
     record_id: int
 
+class GenreIn(BaseModel):
+    name: str
+
 # ---------- п.5: ввод новых данных об ансамблях ----------
 
 @app.post("/ensembles")
@@ -118,6 +127,30 @@ async def list_ensembles():
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT id, name FROM ensembles;")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [{"id": r[0], "name": r[1]} for r in rows]
+
+@app.post("/genres")
+async def add_genre(genre: GenreIn):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO genres (name) VALUES (%s) RETURNING id;",
+        (genre.name,)
+    )
+    genre_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"id": genre_id, "name": genre.name}
+
+@app.get("/genres")
+async def list_genres():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM genres ORDER BY id;")
     rows = cur.fetchall()
     cur.close()
     conn.close()
