@@ -11,6 +11,9 @@ accordingly, and delete the patch script.
 changeBuildType(RelativeId("DockerBuild")) {
     params {
         add {
+            param("stage.db.name", "musicshop")
+        }
+        add {
             param("stage.db.user", "musicshop_user")
         }
     }
