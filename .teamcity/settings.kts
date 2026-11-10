@@ -103,6 +103,26 @@ object DockerBuild : BuildType({
         }
 
         script {
+            name = "Migrate DB schema TEST -> STAGE (Atlas)"
+            id = "migrateSchemaStage"
+            conditions {
+                matches("teamcity.build.branch", "(refs/heads/)?dev")
+            }
+            scriptContent = """
+                set -e
+                STAGE_SSH=%stage.user%@%stage.host%
+                TEST_DB_IP=${'$'}(docker inspect music_shop_db --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+                STAGE_DB_IP=${'$'}(ssh -o StrictHostKeyChecking=accept-new ${'$'}STAGE_SSH "docker inspect music_shop_db --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'")
+                echo "TEST DB: ${'$'}TEST_DB_IP, STAGE DB: ${'$'}STAGE_DB_IP"
+                SOCK=/tmp/stage-tunnel-%build.number%.sock
+                trap 'ssh -S ${'$'}SOCK -O exit ${'$'}STAGE_SSH >/dev/null 2>&1 || true' EXIT
+                ssh -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -M -S ${'$'}SOCK -f -N -L 15432:${'$'}STAGE_DB_IP:5432 ${'$'}STAGE_SSH
+                docker run --rm --network container:teamcity-agent arigaio/atlas schema apply --auto-approve --url "postgres://%stage.db.user%:%stage.db.password%@localhost:15432/%stage.db.name%?search_path=public&sslmode=disable" --to "postgres://%test.db.user%:%test.db.password%@${'$'}TEST_DB_IP:5432/%test.db.name%?search_path=public&sslmode=disable"
+            """.trimIndent()
+        }
+
+
+        script {
             name = "Copy compose to STAGE"
             id = "copyComposeStage"
             conditions {
