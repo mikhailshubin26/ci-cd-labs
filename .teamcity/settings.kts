@@ -9,6 +9,7 @@ version = "2026.2"
 
 project {
     buildType(DockerBuild)
+    buildType(DockerBuildProd)
 }
 
 object DockerBuild : BuildType({
@@ -172,7 +173,181 @@ object DockerBuild : BuildType({
 
     triggers {
         vcs {
-            branchFilter = "+:*"
+            branchFilter = """
+                +:*
+                -:prod
+            """.trimIndent()
+        }
+    }
+})
+
+
+object DockerBuildProd : BuildType({
+    name = "Docker build PROD"
+
+    params {
+        param("docker.image.name", "mikhailshubin26/ci-cd-labs-app")
+        param("docker.image.tag", "prod-%build.number%")
+        param("stage.host", "10.0.2.4")
+        param("stage.user", "mshubin")
+        param("prod.host", "10.0.2.5")
+        param("prod.user", "mshubin241-327")
+        param("stage.db.name", "musicshop")
+        param("stage.db.user", "musicshop_user")
+        password("stage.db.password", "credentialsJSON:9a822a0f-5ece-4111-b9f9-9960303d1900")
+        param("prod.db.name", "musicshop")
+        param("prod.db.user", "musicshop_user")
+        password("prod.db.password", "credentialsJSON:9a822a0f-5ece-4111-b9f9-9960303d1900")
+    }
+
+    vcs {
+        root(DslContext.settingsRoot)
+    }
+
+    steps {
+        script {
+            name = "Security scan (Bandit)"
+            id = "banditScan"
+            scriptContent = """
+                set -e
+                docker run --rm --volumes-from teamcity-agent -w %teamcity.build.checkoutDir% python:3.13-slim sh -c "pip install --no-cache-dir -q bandit && bandit -r app -lll -iii"
+            """.trimIndent()
+        }
+
+        script {
+            name = "Secrets scan (Gitleaks)"
+            id = "gitleaksScan"
+            scriptContent = """
+                set -e
+                docker run --rm --volumes-from teamcity-agent zricethezav/gitleaks:latest dir %teamcity.build.checkoutDir%/app --redact --exit-code 1 -v
+            """.trimIndent()
+        }
+
+        script {
+            name = "SQL security scan (Semgrep)"
+            id = "semgrepScan"
+            scriptContent = """
+                set -e
+                TARGETS="app"
+                if [ -d db ]; then TARGETS="app db"; fi
+                echo "Semgrep targets: ${'$'}TARGETS"
+                docker run --rm --volumes-from teamcity-agent -w %teamcity.build.checkoutDir% semgrep/semgrep semgrep scan --config p/sql-injection --metrics=off --error ${'$'}TARGETS
+            """.trimIndent()
+        }
+
+        script {
+            name = "Unit tests (pytest)"
+            id = "unitTests"
+            scriptContent = """
+                set -e
+                docker run --rm --volumes-from teamcity-agent -w %teamcity.build.checkoutDir% python:3.13-slim sh -c "pip install --no-cache-dir -q -r requirements.txt pytest httpx teamcity-messages && pytest tests/unit --teamcity -v"
+            """.trimIndent()
+        }
+ 
+        script {
+            name = "Integration tests (pytest + PostgreSQL)"
+            id = "integrationTests"
+            scriptContent = """
+                set -e
+                trap 'docker rm -f it-db-%build.number% >/dev/null 2>&1 || true; docker network rm it-net-%build.number% >/dev/null 2>&1 || true' EXIT
+                docker network create it-net-%build.number%
+                docker run -d --name it-db-%build.number% --network it-net-%build.number% --network-alias db -e POSTGRES_DB=testdb -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test postgres:16-alpine
+                timeout 60 sh -c 'until docker exec it-db-%build.number% pg_isready -U test -d testdb; do sleep 1; done'
+                docker run --rm --network it-net-%build.number% --volumes-from teamcity-agent -w %teamcity.build.checkoutDir% -e POSTGRES_DB=testdb -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test python:3.13-slim sh -c "pip install --no-cache-dir -q -r requirements.txt pytest httpx teamcity-messages && pytest tests/integration --teamcity -v"
+            """.trimIndent()
+        }
+
+        dockerCommand {
+            name = "Build image"
+            id = "dockerBuild"
+            commandType = build {
+                source = file {
+                    path = "Dockerfile"
+                }
+                namesAndTags = "%docker.image.name%:%docker.image.tag%"
+                commandArgs = "--pull"
+            }
+        }
+
+        dockerCommand {
+            name = "Push image"
+            id = "dockerPush"
+            commandType = push {
+                namesAndTags = "%docker.image.name%:%docker.image.tag%"
+            }
+        }
+
+        script {
+            name = "Copy compose to PROD"
+            id = "copyComposeProd"
+            scriptContent = """
+                set -e
+                scp -o StrictHostKeyChecking=accept-new docker-compose.prod.yaml %prod.user%@%prod.host%:~/music_shop/docker-compose.prod.yaml
+            """.trimIndent()
+        }
+
+        script {
+            name = "Start DB on PROD"
+            id = "startDbProd"
+            scriptContent = """
+                set -e
+                ssh -o StrictHostKeyChecking=accept-new %prod.user%@%prod.host% "cd ~/music_shop && APP_TAG=%docker.image.tag% docker compose -f docker-compose.prod.yaml up -d db"
+                ssh -o StrictHostKeyChecking=accept-new %prod.user%@%prod.host% 'for i in $(seq 1 30); do [ "$(docker inspect -f {{.State.Health.Status}} music_shop_db)" = healthy ] && echo "PROD DB healthy" && exit 0; sleep 2; done; echo "PROD DB NOT READY"; exit 1'
+            """.trimIndent()
+        }
+
+        script {
+            name = "Migrate DB schema STAGE -> PROD (Atlas)"
+            id = "migrateSchemaProd"
+            scriptContent = """
+                set -e
+                STAGE_SSH=%stage.user%@%stage.host%
+                PROD_SSH=%prod.user%@%prod.host%
+                STAGE_DB_IP=${'$'}(ssh -o StrictHostKeyChecking=accept-new ${'$'}STAGE_SSH "docker inspect music_shop_db --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'")
+                PROD_DB_IP=${'$'}(ssh -o StrictHostKeyChecking=accept-new ${'$'}PROD_SSH "docker inspect music_shop_db --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'")
+                echo "STAGE DB: ${'$'}STAGE_DB_IP, PROD DB: ${'$'}PROD_DB_IP"
+                SOCK_STAGE=/tmp/stage-tunnel-prod-%build.number%.sock
+                SOCK_PROD=/tmp/prod-tunnel-%build.number%.sock
+                trap 'ssh -S ${'$'}SOCK_STAGE -O exit ${'$'}STAGE_SSH >/dev/null 2>&1 || true; ssh -S ${'$'}SOCK_PROD -O exit ${'$'}PROD_SSH >/dev/null 2>&1 || true' EXIT
+                ssh -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -M -S ${'$'}SOCK_STAGE -f -N -L 16432:${'$'}STAGE_DB_IP:5432 ${'$'}STAGE_SSH
+                ssh -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -M -S ${'$'}SOCK_PROD -f -N -L 16433:${'$'}PROD_DB_IP:5432 ${'$'}PROD_SSH
+                docker run --rm --network container:teamcity-agent arigaio/atlas schema apply --auto-approve --url "postgres://%prod.db.user%:%prod.db.password%@localhost:16433/%prod.db.name%?search_path=public&sslmode=disable" --to "postgres://%stage.db.user%:%stage.db.password%@localhost:16432/%stage.db.name%?search_path=public&sslmode=disable"
+            """.trimIndent()
+        }
+
+        script {
+            name = "Deploy to PROD"
+            id = "deployProd"
+            scriptContent = """
+                set -e
+                ssh -o StrictHostKeyChecking=accept-new %prod.user%@%prod.host% "cd ~/music_shop && APP_TAG=%docker.image.tag% docker compose -f docker-compose.prod.yaml pull && APP_TAG=%docker.image.tag% docker compose -f docker-compose.prod.yaml up -d --remove-orphans"
+            """.trimIndent()
+        }
+
+        script {
+            name = "Verify PROD"
+            id = "verifyProd"
+            scriptContent = """
+                set -e
+                ssh -o StrictHostKeyChecking=accept-new %prod.user%@%prod.host% 'for i in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:8000/docs && echo "PROD OK, tag %docker.image.tag%" && exit 0; sleep 2; done; echo "PROD FAILED"; exit 1'
+            """.trimIndent()
+        }
+    }
+
+    features {
+        dockerSupport {
+            loginToRegistry = on {
+                dockerRegistryId = "PROJECT_EXT_3"
+            }
+        }
+        sshAgent {
+            teamcitySshKey = "stage_deploy"
+        }
+    }
+
+    triggers {
+        vcs {
+            branchFilter = "+:prod"
         }
     }
 })
