@@ -297,6 +297,16 @@ object DockerBuildProd : BuildType({
         }
 
         script {
+            name = "Backup PROD database"
+            id = "backupProd"
+            scriptContent = """
+                set -e
+                scp -o StrictHostKeyChecking=accept-new scripts/backup_db.sh %prod.user%@%prod.host%:~/music_shop/backup_db.sh
+                ssh -o StrictHostKeyChecking=accept-new %prod.user%@%prod.host% "bash ~/music_shop/backup_db.sh %prod.db.name% %prod.db.user%"
+            """.trimIndent()
+        }
+
+        script {
             name = "Migrate DB schema STAGE -> PROD (Atlas)"
             id = "migrateSchemaProd"
             scriptContent = """
